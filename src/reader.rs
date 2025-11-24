@@ -17,6 +17,19 @@ impl<'a, R: Read> SubBlockReader<'a, R> {
             finished: false,
         }
     }
+
+    /// Consume every remaining bytes in the current block and in the following blocks
+    /// until we find and consume the terminator block (0x00)
+    pub fn consume_to_end(&mut self) -> io::Result<()> {
+        let mut discard_buf = [0u8; 1024];
+        loop {
+            let n = self.read(&mut discard_buf)?;
+            if n == 0 {
+                break;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<'a, R: Read> Read for SubBlockReader<'a, R> {

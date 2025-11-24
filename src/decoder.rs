@@ -1,6 +1,6 @@
 use std::{io::Read};
 
-use crate::{error::DecodingError, reader::SubBlockReader, structs::{Color, DisposalMethod, GraphicControl, ImageDescriptor, LogicalScreenDescriptor, Palette}};
+use crate::{error::DecodingError, lzw::LzwDecoder, reader::SubBlockReader, structs::{Color, DisposalMethod, GraphicControl, ImageDescriptor, LogicalScreenDescriptor, Palette}};
 
 pub struct Decoder<R> {
     reader: R,
@@ -107,6 +107,80 @@ impl<R: Read> Decoder<R> {
     /// The first byte read from this reader will be `LZW Minimum Code Size`
     pub fn lzw_reader(&mut self) -> SubBlockReader<'_, R> {
         SubBlockReader::new(&mut self.reader)
+    }
+
+    /// Decodes the entire frame in a linear buffer
+    /// The buffer must be big `width * height`
+    /// Returns true if the image is completely decoded
+    pub fn decode_frame_into(&mut self, descriptor: &ImageDescriptor, output_buffer: &mut [u8]) -> Result<(), DecodingError> {
+        let width = descriptor.width as usize;
+        let height = descriptor.height as usize;
+        let expected_pixels = width * height;
+
+        if output_buffer.len() < expected_pixels {
+            return Err(DecodingError::Format(
+                format!(
+                    "Buffer too small. Requested {} bytes, received {}",
+                    expected_pixels, output_buffer.len(),
+                )
+            ))
+        }
+
+        let mut min_code_size_buf = [0u8; 1];
+        self.reader.read_exact(&mut min_code_size_buf)?;
+        let min_code_size = min_code_size_buf[0];
+
+        let mut sub_reader = SubBlockReader::new(&mut self.reader);
+        let mut lzw = LzwDecoder::new(&mut sub_reader, min_code_size);
+
+        let is_interlaced = descriptor.is_interlaced();
+
+        let (mut pass, mut y, mut checked_pass_advance) = (0, 0, false);
+        let pass_starts = [0, 4, 2, 1];
+        let pass_steps  = [8, 8, 4, 2];
+
+        if !is_interlaced {
+            let mut offset = 0;
+            while offset < expected_pixels {
+                let n = lzw.decode_bytes(&mut output_buffer[offset..expected_pixels])?;
+                if n == 0 { break; }
+                offset += n;
+            }
+        } else {
+            let mut lzw_chunk = [0u8; 1024];
+            let mut x = 0;
+
+            loop {
+                let n = lzw.decode_bytes(&mut lzw_chunk)?;
+                if n == 0 { break; }
+
+                for &pixel in &lzw_chunk[..n] {
+                    if y >= height { break; } 
+                    
+                    let output_idx = y * width + x;
+                    if output_idx < output_buffer.len() {
+                        output_buffer[output_idx] = pixel;
+                    }
+
+                    x += 1;
+                    
+                    if x == width {
+                        x = 0;
+                        y += pass_steps[pass];
+                        
+                        while y >= height && pass < 3 {
+                            pass += 1;
+                            y = pass_starts[pass];
+                        }
+                    }
+                }
+            }
+        }
+
+        drop(lzw);
+        sub_reader.consume_to_end()?;
+
+        Ok(())
     }
 
     fn read_palette(reader: &mut R, size: usize) -> Result<Palette, DecodingError> {
