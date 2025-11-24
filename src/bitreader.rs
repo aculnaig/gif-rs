@@ -27,11 +27,12 @@ impl<R: Read> BitReader<R> {
             if bytes_read == 0 {
                 return Err(io::Error::new(
                     io::ErrorKind::UnexpectedEof,
-                    "End of stream while reading LZW bits"
+                    "End of stream while reading LZW bits",
                 ));
             }
 
-            self.bit_buffer |= (byte[0] as u64) << self.bits_in_buffer;
+            self.bit_buffer |=
+                (byte[0] as u64) << self.bits_in_buffer;
             self.bits_in_buffer += 8;
         }
 

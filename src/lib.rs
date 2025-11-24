@@ -1,6 +1,6 @@
-mod error;
-mod structs;
-mod decoder;
-mod reader;
 mod bitreader;
+mod decoder;
+mod error;
 mod lzw;
+mod reader;
+mod structs;

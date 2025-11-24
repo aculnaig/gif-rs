@@ -12,9 +12,15 @@ impl fmt::Display for DecodingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DecodingError::Io(err) => write!(f, "IO error: {}", err),
-            DecodingError::InvalidSignature => write!(f, "Invalid GIF signature"),
-            DecodingError::Format(msg) => write!(f, "Format error: {}", msg),
-            DecodingError::Unuspported(msg) => write!(f, "Unsupported feature: {}", msg),
+            DecodingError::InvalidSignature => {
+                write!(f, "Invalid GIF signature")
+            }
+            DecodingError::Format(msg) => {
+                write!(f, "Format error: {}", msg)
+            }
+            DecodingError::Unuspported(msg) => {
+                write!(f, "Unsupported feature: {}", msg)
+            }
         }
     }
 }

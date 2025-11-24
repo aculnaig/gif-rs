@@ -61,15 +61,22 @@ impl<R: Read> LzwDecoder<R> {
         }
     }
 
-    pub fn decode_bytes(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    pub fn decode_bytes(
+        &mut self,
+        buf: &mut [u8],
+    ) -> io::Result<usize> {
         let mut bytes_written = 0;
 
         while bytes_written < buf.len() {
             if self.stack_top > 0 {
-                let count = std::cmp::min(self.stack_top, buf.len() - bytes_written);
+                let count = std::cmp::min(
+                    self.stack_top,
+                    buf.len() - bytes_written,
+                );
                 for i in 0..count {
                     self.stack_top -= 1;
-                    buf[bytes_written] = self.pixel_stack[self.stack_top];
+                    buf[bytes_written] =
+                        self.pixel_stack[self.stack_top];
                     bytes_written += 1;
                 }
                 if bytes_written == buf.len() {
@@ -90,37 +97,55 @@ impl<R: Read> LzwDecoder<R> {
             }
 
             let mut current_code = code;
-            
+
             if code >= self.next_available_code {
-                if code == self.next_available_code && self.old_code != INVALID_CODE {
-                    self.pixel_stack[self.stack_top] = self.first_pixel_of_sequence;
+                if code == self.next_available_code
+                    && self.old_code != INVALID_CODE
+                {
+                    self.pixel_stack[self.stack_top] =
+                        self.first_pixel_of_sequence;
                     self.stack_top += 1;
                     current_code = self.old_code;
                 } else {
-                    return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid LZW code"));
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Invalid LZW code",
+                    ));
                 }
             }
 
             while current_code >= self.clear_code {
                 if self.stack_top >= MAX_CODES {
-                     return Err(io::Error::new(io::ErrorKind::InvalidData, "LZW stack overflow"));
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "LZW stack overflow",
+                    ));
                 }
-                
-                self.pixel_stack[self.stack_top] = self.suffix[current_code as usize];
+
+                self.pixel_stack[self.stack_top] =
+                    self.suffix[current_code as usize];
                 self.stack_top += 1;
                 current_code = self.prefix[current_code as usize];
             }
 
-            self.first_pixel_of_sequence = self.suffix[current_code as usize];
-            self.pixel_stack[self.stack_top] = self.first_pixel_of_sequence;
+            self.first_pixel_of_sequence =
+                self.suffix[current_code as usize];
+            self.pixel_stack[self.stack_top] =
+                self.first_pixel_of_sequence;
             self.stack_top += 1;
 
-            if self.old_code != INVALID_CODE && self.next_available_code < MAX_CODES as u16 {
-                self.prefix[self.next_available_code as usize] = self.old_code;
-                self.suffix[self.next_available_code as usize] = self.first_pixel_of_sequence;
+            if self.old_code != INVALID_CODE
+                && self.next_available_code < MAX_CODES as u16
+            {
+                self.prefix[self.next_available_code as usize] =
+                    self.old_code;
+                self.suffix[self.next_available_code as usize] =
+                    self.first_pixel_of_sequence;
                 self.next_available_code += 1;
 
-                if self.next_available_code >= (1 << self.code_size) && self.code_size < 12 {
+                if self.next_available_code >= (1 << self.code_size)
+                    && self.code_size < 12
+                {
                     self.code_size += 1;
                 }
             }

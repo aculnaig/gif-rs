@@ -52,7 +52,7 @@ impl<'a, R: Read> Read for SubBlockReader<'a, R> {
                     self.finished = true;
                     return Ok(0);
                 }
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => return Err(e),
             }
 
@@ -66,7 +66,8 @@ impl<'a, R: Read> Read for SubBlockReader<'a, R> {
             self.remaining_in_block = block_size;
         }
 
-        let max_read = std::cmp::min(buf.len(), self.remaining_in_block);
+        let max_read =
+            std::cmp::min(buf.len(), self.remaining_in_block);
 
         let read_amount = self.reader.read(&mut buf[..max_read])?;
 
@@ -74,7 +75,7 @@ impl<'a, R: Read> Read for SubBlockReader<'a, R> {
         if read_amount == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
-                "GIF stream truncated inside a data sub-block"
+                "GIF stream truncated inside a data sub-block",
             ));
         }
 
