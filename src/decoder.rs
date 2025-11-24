@@ -1,6 +1,6 @@
 use std::{io::Read};
 
-use crate::{error::DecodingError, structs::{Color, DisposalMethod, GraphicControl, ImageDescriptor, LogicalScreenDescriptor, Palette}};
+use crate::{error::DecodingError, reader::SubBlockReader, structs::{Color, DisposalMethod, GraphicControl, ImageDescriptor, LogicalScreenDescriptor, Palette}};
 
 pub struct Decoder<R> {
     reader: R,
@@ -98,6 +98,15 @@ impl<R: Read> Decoder<R> {
             }
         }
 
+    }
+
+    /// Obtains a reader with the current frame compressed data
+    /// 
+    /// It must be called right after getting `Block::Image` and eventually read the Local Palette.
+    /// 
+    /// The first byte read from this reader will be `LZW Minimum Code Size`
+    pub fn lzw_reader(&mut self) -> SubBlockReader<'_, R> {
+        SubBlockReader::new(&mut self.reader)
     }
 
     fn read_palette(reader: &mut R, size: usize) -> Result<Palette, DecodingError> {
