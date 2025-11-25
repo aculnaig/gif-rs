@@ -3,4 +3,5 @@ mod decoder;
 mod error;
 mod lzw;
 mod reader;
+mod render;
 mod structs;
