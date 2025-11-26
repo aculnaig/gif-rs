@@ -1,7 +1,7 @@
 use std::{io::Read, vec};
 
 use crate::{
-    error::DecodingError, frame::Frame, lzw::LzwDecoder, reader::SubBlockReader, render::GifColor, structs::{
+    animator::GifStream, error::DecodingError, frame::Frame, lzw::LzwDecoder, reader::SubBlockReader, render::GifColor, structs::{
         Color, DisposalMethod, GraphicControl, ImageDescriptor,
         LogicalScreenDescriptor, Palette,
     }
@@ -259,6 +259,10 @@ impl<R: Read> Decoder<R> {
             pixels: rgba_buffer,
             transparent_index: transparent_idx,
         }))
+    }
+
+    pub fn into_stream(self) -> Result<GifStream<R>, DecodingError> {
+        GifStream::new(self)
     }
 
     fn read_palette(
