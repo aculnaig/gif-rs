@@ -1,13 +1,10 @@
-use std::io::Read;
+use std::{io::Read, vec};
 
 use crate::{
-    error::DecodingError,
-    lzw::LzwDecoder,
-    reader::SubBlockReader,
-    structs::{
+    error::DecodingError, frame::Frame, lzw::LzwDecoder, reader::SubBlockReader, render::GifColor, structs::{
         Color, DisposalMethod, GraphicControl, ImageDescriptor,
         LogicalScreenDescriptor, Palette,
-    },
+    }
 };
 
 pub struct Decoder<R> {
@@ -214,6 +211,54 @@ impl<R: Read> Decoder<R> {
         sub_reader.consume_to_end()?;
 
         Ok(())
+    }
+
+    pub fn next_frame(&mut self) -> Result<Option<Frame>, DecodingError> {
+        let (descriptor, control_ext) = match self.next_record()? {
+            Block::Image(desc, ext) => (desc, ext),
+            Block::Trailer => return Ok(None),
+            Block::Extension => return self.next_frame(),
+        };
+
+        let active_palette: Palette = if descriptor.has_local_palette() {
+            let size = descriptor.local_palette_size();
+            Self::read_palette(&mut self.reader, size)?
+        } else {
+            match &self.global_palette {
+                Some(p) => p.clone(),
+                None => return Err(DecodingError::Format("No Global or Local palette found".into())),
+            }
+        };
+
+        let pixel_count = (descriptor.width as usize) * (descriptor.height as usize);
+
+        let mut index_buffer = vec![0u8; pixel_count];
+
+        let mut rgba_buffer = vec![GifColor::transparent(); pixel_count];
+
+        self.decode_frame_into(&descriptor, &mut index_buffer)?;
+
+        GifColor::map_indices_to_rgba(
+            &index_buffer,
+            &active_palette,
+            &control_ext,
+            &mut rgba_buffer
+        )?;
+
+        let delay_cs = control_ext.map(|x| x.delay_time_cs).unwrap_or(0);
+        let disposal = control_ext.map(|x| x.disposal_method).unwrap_or_default();
+        let transparent_idx = control_ext.and_then(|x| x.transparent_color_index);
+
+        Ok(Some(Frame {
+            delay_cs,
+            disposal,
+            left: descriptor.left,
+            top: descriptor.top,
+            width: descriptor.width,
+            height: descriptor.height,
+            pixels: rgba_buffer,
+            transparent_index: transparent_idx,
+        }))
     }
 
     fn read_palette(

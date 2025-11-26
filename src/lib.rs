@@ -5,3 +5,4 @@ mod lzw;
 mod reader;
 mod render;
 mod structs;
+mod frame;
